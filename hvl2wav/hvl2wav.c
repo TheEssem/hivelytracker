@@ -135,20 +135,11 @@ int main( int argc, char *argv[] )
     return 0;
   }
 
-  framelen = (mix_freq*2*2)/50;
-  mixbuf = malloc( framelen );
-  if( !mixbuf )
-  {
-    printf( "Out of memory :-(\n" );
-    return 0;
-  }
-
   hvl_InitReplayer();
 
   ht = hvl_LoadTune( filename, mix_freq, stereosep );
   if( !ht )
   {
-    free( mixbuf );
     printf( "Unable to open '%s'\n", filename );
     return 0;
   }
@@ -156,7 +147,6 @@ int main( int argc, char *argv[] )
   if( !hvl_InitSubsong( ht, subsong ) )
   {
     hvl_FreeTune( ht );
-    free( mixbuf );
     printf( "Unable to initialise subsong %ld\n", subsong );
     return 0;
   }
@@ -204,10 +194,21 @@ int main( int argc, char *argv[] )
   if( !tf )
   {
     hvl_FreeTune( ht );
-    free( mixbuf );
     printf( "Unable to open '%s' for output\n", tmpname );
     return 0;
   }
+
+  framelen = (mix_freq*2*ht->ht_Channels*2)/50;
+  mixbuf = malloc( framelen );
+  if( !mixbuf )
+  {
+    hvl_FreeTune( ht );
+    unlink( tmpname );
+    printf( "Out of memory :-(\n" );
+    return 0;
+  }
+
+  printf("%p\n", (void *)mixbuf);
 
   frm = 0;
   smplen = 0;
@@ -216,7 +217,7 @@ int main( int argc, char *argv[] )
     if( ( use_songend ) && ( ht->ht_SongEndReached ) )
       break;
 
-    hvl_DecodeFrame( ht, mixbuf, &mixbuf[2], 4 );
+    hvl_DecodeFrame( ht, mixbuf, ht->ht_Channels * 2 * 2 );
 
 #ifdef _BIG_ENDIAN_
     // The replayer generates audio samples in the same
@@ -265,10 +266,10 @@ int main( int argc, char *argv[] )
   fprintf( of, "fmt " );
   write32( of, 16 );
   write16( of, 1 );
-  write16( of, 2 );
+  write16( of, ht->ht_Channels*2 );
   write32( of, mix_freq );
-  write32( of, mix_freq*4 );
-  write16( of, 4 );
+  write32( of, mix_freq*((ht->ht_Channels*2)*16/8) );
+  write16( of, (ht->ht_Channels*2)*16/8 );
   write16( of, 16 );
   fprintf( of, "data" );
   write32( of, smplen );

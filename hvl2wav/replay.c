@@ -1934,7 +1934,7 @@ void hvl_play_irq( struct hvl_tune *ht )
     hvl_set_audio( &ht->ht_Voices[i], ht->ht_Frequency );
 }
 
-void hvl_mixchunk( struct hvl_tune *ht, uint32 samples, int8 *buf1, int8 *buf2, int32 bufmod )
+void hvl_mixchunk( struct hvl_tune *ht, uint32 samples, int8 *buf, int32 bufmod )
 {
   const int8   *src[MAX_CHANNELS];
   const int8   *rsrc[MAX_CHANNELS];
@@ -1991,8 +1991,6 @@ void hvl_mixchunk( struct hvl_tune *ht, uint32 samples, int8 *buf1, int8 *buf2, 
     // Inner loop
     do
     {
-      a=0;
-      b=0;
       for( i=0; i<chans; i++ )
       {
         if( rsrc[i] )
@@ -2006,26 +2004,29 @@ void hvl_mixchunk( struct hvl_tune *ht, uint32 samples, int8 *buf1, int8 *buf2, 
         
 //        if( abs( j ) > vu[i] ) vu[i] = abs( j );
 
+        a=0;
+        b=0;
+
         a += (j * panl[i]) >> 7;
         b += (j * panr[i]) >> 7;
+
+        a = (a*ht->ht_mixgain)>>8;
+        b = (b*ht->ht_mixgain)>>8;
+
+        if (a<-0x8000) a=-0x8000;
+        if (a> 0x7fff) a= 0x7fff;
+        if (b<-0x8000) b=-0x8000;
+        if (b> 0x7fff) b= 0x7fff;
+
+        *(int16 *)buf = a;
+        *(int16 *)(buf + 2) = b;
+        
+        buf += 4;
+
         pos[i] += delta[i];
       }
       
-      a = (a*ht->ht_mixgain)>>8;
-      b = (b*ht->ht_mixgain)>>8;
-
-      if (a<-0x8000) a=-0x8000;
-      if (a> 0x7fff) a= 0x7fff;
-      if (b<-0x8000) b=-0x8000;
-      if (b> 0x7fff) b= 0x7fff;
-      
-      *(int16 *)buf1 = a;
-      *(int16 *)buf2 = b;
-      
       loops--;
-      
-      buf1 += bufmod;
-      buf2 += bufmod;
     } while( loops > 0 );
   } while( samples > 0 );
 
@@ -2037,7 +2038,7 @@ void hvl_mixchunk( struct hvl_tune *ht, uint32 samples, int8 *buf1, int8 *buf2, 
   }
 }
 
-void hvl_DecodeFrame( struct hvl_tune *ht, int8 *buf1, int8 *buf2, int32 bufmod )
+void hvl_DecodeFrame( struct hvl_tune *ht, int8 *buf, int32 bufmod )
 {
   uint32 samples, loops;
   
@@ -2047,9 +2048,8 @@ void hvl_DecodeFrame( struct hvl_tune *ht, int8 *buf1, int8 *buf2, int32 bufmod 
   do
   {
     hvl_play_irq( ht );
-    hvl_mixchunk( ht, samples, buf1, buf2, bufmod );
-    buf1 += samples * bufmod;
-    buf2 += samples * bufmod;
+    hvl_mixchunk( ht, samples, buf, bufmod );
+    buf += samples * bufmod;
     loops--;
   } while( loops );
 }
