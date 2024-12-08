@@ -208,8 +208,6 @@ int main( int argc, char *argv[] )
     return 0;
   }
 
-  printf("%p\n", (void *)mixbuf);
-
   frm = 0;
   smplen = 0;
   while( frm < max_frames )
